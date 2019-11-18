@@ -3,7 +3,7 @@ Clear-Host
 Write-Output ('')
 Write-Output '============================================================================================================================================================'
 Write-Output ('Profile Cleanup Utility')
-Write-Output ('v0.93')
+Write-Output ('v0.94')
 Write-Output ('danhil@microsoft.com')
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
 Write-Output ('')
@@ -68,9 +68,9 @@ foreach ($ProfileDirectory in $ProfileDirectories) {
         } else {
             Write-Output ('Valid:             False')
             Write-Output $ProfileDirectory
-            # takeown.exe /R /D J /F $ProfileDirectory | out-null
-            # icacls.exe $ProfileDirectory /t /grant *S-1-1-0:F /inheritance:r | out-null
-            # Get-ChildItem $ProfileDirectory -Recurse -force| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
+            takeown.exe /R /D J /F $ProfileDirectory | out-null
+            icacls.exe $ProfileDirectory /t /grant *S-1-1-0:F /inheritance:r | out-null
+            Get-ChildItem $ProfileDirectory -Recurse -force| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
             # Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
             cmd /c rmdir $ProfileDirectory /S /Q
             Write-output ('Status:            Deleted')
