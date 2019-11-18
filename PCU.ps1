@@ -3,7 +3,7 @@ Clear-Host
 Write-Output ('')
 Write-Output '============================================================================================================================================================'
 Write-Output ('Profile Cleanup Utility')
-Write-Output ('v0.94')
+Write-Output ('v0.95')
 Write-Output ('danhil@microsoft.com')
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
 Write-Output ('')
@@ -37,7 +37,7 @@ foreach ($Profile in $ProfileListWMI) {
             icacls.exe $Profile.LocalPath /t /grant *S-1-1-0:F /inheritance:r | out-null
             Get-ChildItem $Profile.LocalPath -Recurse| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
             # Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
-            cmd /c rmdir $ProfileDirectory /S /Q
+            rmdir $ProfileDirectory /S /Q
             Write-output ('Status:            Deleted')
         } else {
             Write-Output ('Valid:             True')
@@ -48,36 +48,6 @@ foreach ($Profile in $ProfileListWMI) {
 Write-Output ('')
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
 Write-Output ('')
-
-Write-Output 'DIRECTORY CLEANUP - NO PROFILE IN REGISTRY
-Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
-$ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | ForEach-Object {$_.FullName}).tolower()
-foreach ($ProfileDirectory in $ProfileDirectories) {
-    $ExcludedDirectory = $False
-    foreach ($ExcludedPath in $ExcludedPaths) {
-        if ($ProfileDirectory -eq $ExcludedPath.tolower()) {
-            $ExcludedDirectory = $True
-        }
-    }
-    if (!$ExcludedDirectory) {
-        Write-Output ('')
-        Write-Output ('Profile Directory: ' + $ProfileDirectory)
-        if ($ProfileDirectory -notmatch ".ad") {
-            Write-Output ('Valid:             True')
-            Write-output ('Status:            Untouched')
-        } else {
-            Write-Output ('Valid:             False')
-            Write-Output $ProfileDirectory
-            takeown.exe /R /D J /F $ProfileDirectory | out-null
-            icacls.exe $ProfileDirectory /t /grant *S-1-1-0:F /inheritance:r | out-null
-            Get-ChildItem $ProfileDirectory -Recurse -force| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
-            # Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
-            cmd /c rmdir $ProfileDirectory /S /Q
-            Write-output ('Status:            Deleted')
-        }
-    }
-}
-
 
 Write-Output 'DIRECTORY CLEANUP - MISSING NTUSER.DAT'
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
@@ -102,7 +72,7 @@ foreach ($ProfileDirectory in $ProfileDirectories) {
             icacls.exe $ProfileDirectory /t /grant *S-1-1-0:F /inheritance:r | out-null
             Get-ChildItem $ProfileDirectory -Recurse -force| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
             # Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
-            cmd /c rmdir $ProfileDirectory /S /Q
+            rmdir $ProfileDirectory /S /Q
             Write-output ('Status:            Deleted')
         }
     }
@@ -134,7 +104,7 @@ foreach ($ProfileDirectory in $ProfileDirectories) {
         icacls.exe $ProfileDirectory /t /grant *S-1-1-0:F /inheritance:r | out-null
         Get-ChildItem $ProfileDirectory -Recurse| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
         # Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
-        cmd /c rmdir $ProfileDirectory /S /Q
+        rmdir $ProfileDirectory /S /Q
         Write-output ('Status:            Deleted')
     } else {
         Write-output ('Status:            Untouched')
