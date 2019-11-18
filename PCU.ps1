@@ -49,7 +49,7 @@ Write-Output ('')
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
 Write-Output ('')
 
-Write-Output 'DIRECTORY CLEANUP - *.AD Profile'
+Write-Output 'DIRECTORY CLEANUP - NO PROFILE IN REGISTRY
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
 $ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | ForEach-Object {$_.FullName}).tolower()
 foreach ($ProfileDirectory in $ProfileDirectories) {
@@ -69,8 +69,6 @@ foreach ($ProfileDirectory in $ProfileDirectories) {
             Write-Output ('Valid:             False')
             Write-Output $ProfileDirectory
             # takeown.exe /R /D J /F $ProfileDirectory | out-null
-            # takeown.exe /R /D J /F $ProfileDirectory
-            # icacls.exe $ProfileDirectory /t /grant *S-1-1-0:F /inheritance:r
             # icacls.exe $ProfileDirectory /t /grant *S-1-1-0:F /inheritance:r | out-null
             # Get-ChildItem $ProfileDirectory -Recurse -force| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
             # Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
