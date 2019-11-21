@@ -1,13 +1,8 @@
 Clear-Host
 
-Write-Output ('')
-Write-Output '============================================================================================================================================================'
-Write-Output ('Profile Cleanup Utility')
-Write-Output ('v0.96')
-Write-Output ('danhil@microsoft.com')
-Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
-Write-Output ('')
-Write-Output ('')
+$Culture = [System.Globalization.CultureInfo]::GetCultureInfo('en-US')
+[System.Threading.Thread]::CurrentThread.CurrentUICulture = $Culture
+[System.Threading.Thread]::CurrentThread.CurrentCulture = $Culture
 
 $ExcludedPaths=@('C:\users\all users','C:\users\default','C:\users\default user','C:\users\public')
 $ExcludedAccountsForRetention=@('Administrator')
@@ -17,6 +12,14 @@ $ProfileImagePaths=$ExcludedPaths
 $ProfileListRegistry = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList' -Recurse
 $ProfileListWMI = Get-WmiObject Win32_UserProfile | Where-Object { $_.LocalPath -notlike 'C:\WINDOWS*'}
 
+Write-Output ('')
+Write-Output '============================================================================================================================================================'
+Write-Output ('Profile Cleanup Utility')
+Write-Output ('v0.96')
+Write-Output ('danhil@microsoft.com')
+Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
+Write-Output ('')
+Write-Output ('')
 
 Write-Output 'RETENTION POLICY CHECK'
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
@@ -33,7 +36,7 @@ foreach ($Profile in $ProfileListWMI) {
         Write-Output ('LastUseTime:       ' + [Management.ManagementDateTimeConverter]::ToDateTime($Profile.LastUseTime))
         if ([Management.ManagementDateTimeConverter]::ToDateTime($Profile.LastUseTime) -lt (get-date).adddays($RetentionInDays)) {
             Write-Output ('Valid:             False')
-            takeown.exe /R /D J /F $Profile.LocalPath | out-null
+            takeown.exe /R /D Y /F $Profile.LocalPath | out-null
             icacls.exe $Profile.LocalPath /t /grant *S-1-1-0:F /inheritance:r | out-null
             Get-ChildItem $Profile.LocalPath -Recurse| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
             Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
@@ -67,7 +70,7 @@ foreach ($ProfileDirectory in $ProfileDirectories) {
         } else {
             Write-Output ('Valid:             False')
             Write-Output $ProfileDirectory
-            takeown.exe /R /D J /F $ProfileDirectory | out-null
+            takeown.exe /R /D Y /F $ProfileDirectory | out-null
             icacls.exe $ProfileDirectory /t /grant *S-1-1-0:F /inheritance:r | out-null
             Get-ChildItem $ProfileDirectory -Recurse -force| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
             Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
@@ -98,7 +101,7 @@ foreach ($ProfileDirectory in $ProfileDirectories) {
     Write-Output ('Profile Directory: ' + $ProfileDirectory)
     Write-Output ('Valid:             ' + $ValidDirectory)
     if (!$ValidDirectory) {
-        takeown.exe /R /D J /F $ProfileDirectory | out-null
+        takeown.exe /R /D Y /F $ProfileDirectory | out-null
         icacls.exe $ProfileDirectory /t /grant *S-1-1-0:F /inheritance:r | out-null
         Get-ChildItem $ProfileDirectory -Recurse| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
         Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
