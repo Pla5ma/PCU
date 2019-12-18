@@ -31,19 +31,21 @@ foreach ($Profile in $ProfileListWMI) {
         }
     }
     if (!$ExcludedAccount) {
-        Write-Output ('')
-        Write-Output ('Profile Directory: ' + $Profile.LocalPath)
-        Write-Output ('LastUseTime:       ' + [Management.ManagementDateTimeConverter]::ToDateTime($Profile.LastUseTime))
-        if ([Management.ManagementDateTimeConverter]::ToDateTime($Profile.LastUseTime) -lt (get-date).adddays($RetentionInDays)) {
-            Write-Output ('Valid:             False')
-            takeown.exe /R /D Y /F $Profile.LocalPath | out-null
-            icacls.exe $Profile.LocalPath /t /grant *S-1-1-0:F /inheritance:r | out-null
-            Get-ChildItem $Profile.LocalPath -Recurse| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
-            Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
-            Write-output ('Status:            Deleted')
-        } else {
-            Write-Output ('Valid:             True')
-            Write-output ('Status:            Untouched')
+        if (($Profile.LastUseTime -ne '') -and ($Profile.LastUseTime -ne $null)) {
+            Write-Output ('')
+            Write-Output ('Profile Directory: ' + $Profile.LocalPath)
+            Write-Output ('LastUseTime:       ' + [Management.ManagementDateTimeConverter]::ToDateTime($Profile.LastUseTime))
+            if ([Management.ManagementDateTimeConverter]::ToDateTime($Profile.LastUseTime) -lt (get-date).adddays($RetentionInDays)) {
+                Write-Output ('Valid:             False')
+                takeown.exe /R /D Y /F $Profile.LocalPath | out-null
+                icacls.exe $Profile.LocalPath /t /grant *S-1-1-0:F /inheritance:r | out-null
+                Get-ChildItem $Profile.LocalPath -Recurse| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
+                Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
+                Write-output ('Status:            Deleted')
+            } else {
+                Write-Output ('Valid:             True')
+                Write-output ('Status:            Untouched')
+            }
         }
     }
 }
