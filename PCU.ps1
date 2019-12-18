@@ -27,8 +27,10 @@ Write-Output '------------------------------------------------------------------
 foreach ($Profile in $ProfileListWMI) {
     $ExcludedAccount = $False
     foreach ($Account in $ExcludedAccountsForRetention) {
-        if (($Profile.LocalPath.tolower() -like '*'+$Account.tolower()+'*') -or ($Profile.LocalPath)) {
-            $ExcludedAccount = $True
+        if ($Profile.LocalPath) {
+            if ($Profile.LocalPath.tolower() -like '*'+$Account.tolower()+'*') {
+                $ExcludedAccount = $True
+            }
         }
     }
     if (!$ExcludedAccount) {
