@@ -1,10 +1,19 @@
-Clear-Host
+cls
 
 $Culture = [System.Globalization.CultureInfo]::GetCultureInfo('en-US')
 [System.Threading.Thread]::CurrentThread.CurrentUICulture = $Culture
 [System.Threading.Thread]::CurrentThread.CurrentCulture = $Culture
 
-$ExcludedPaths=@('C:\users\all users','C:\users\default','C:\users\default user','C:\users\public')
+Write-Output ('')
+Write-Output '============================================================================================================================================================'
+Write-Output ('Profile Cleanup Utility')
+Write-Output ('v0.95')
+Write-Output ('danhil@microsoft.com')
+Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
+Write-Output ('')
+Write-Output ('')
+
+$ExcludedPaths=@('C:\users\all users','C:\users\default','C:\users\default user','C:\users\public','C:\users\svc-alti-05','C:\users\svc-alti-03')
 $ExcludedAccountsForRetention=@('Administrator')
 $RetentionInDays=-40
 
@@ -12,21 +21,13 @@ $ProfileImagePaths=$ExcludedPaths
 $ProfileListRegistry = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList' -Recurse
 $ProfileListWMI = Get-WmiObject Win32_UserProfile | Where-Object { $_.LocalPath -notlike 'C:\WINDOWS*'}
 
-Write-Output ('')
-Write-Output '============================================================================================================================================================'
-Write-Output ('Profile Cleanup Utility')
-Write-Output ('v0.96')
-Write-Output ('danhil@microsoft.com')
-Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
-Write-Output ('')
-Write-Output ('')
 
 Write-Output 'RETENTION POLICY CHECK'
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
 foreach ($Profile in $ProfileListWMI) {
     $ExcludedAccount = $False
     foreach ($Account in $ExcludedAccountsForRetention) {
-        if ($Profile.LocalPath.tolower() -like '*'+$Account.tolower()+'*') {
+        if (($Profile.LocalPath.tolower() -like '*'+$Account.tolower()+'*') -or ($Profile.LocalPath)) {
             $ExcludedAccount = $True
         }
     }
@@ -40,7 +41,8 @@ foreach ($Profile in $ProfileListWMI) {
                 takeown.exe /R /D Y /F $Profile.LocalPath | out-null
                 icacls.exe $Profile.LocalPath /t /grant *S-1-1-0:F /inheritance:r | out-null
                 Get-ChildItem $Profile.LocalPath -Recurse| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
-                Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
+                # Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
+                cmd /c rmdir $ProfileDirectory /S /Q
                 Write-output ('Status:            Deleted')
             } else {
                 Write-Output ('Valid:             True')
@@ -55,7 +57,7 @@ Write-Output ('')
 
 Write-Output 'DIRECTORY CLEANUP - MISSING NTUSER.DAT'
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
-$ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | ForEach-Object {$_.FullName}).tolower()
+$ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | %{$_.FullName}).tolower()
 foreach ($ProfileDirectory in $ProfileDirectories) {
     $ExcludedDirectory = $False
     foreach ($ExcludedPath in $ExcludedPaths) {
@@ -75,7 +77,8 @@ foreach ($ProfileDirectory in $ProfileDirectories) {
             takeown.exe /R /D Y /F $ProfileDirectory | out-null
             icacls.exe $ProfileDirectory /t /grant *S-1-1-0:F /inheritance:r | out-null
             Get-ChildItem $ProfileDirectory -Recurse -force| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
-            Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
+            # Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
+            cmd /c rmdir $ProfileDirectory /S /Q
             Write-output ('Status:            Deleted')
         }
     }
@@ -86,7 +89,7 @@ Write-Output ('')
 
 Write-Output 'DIRECTORY CLEANUP - MISSING PROFILELIST ENTRY'
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
-$ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | ForEach-Object {$_.FullName}).tolower()
+$ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | %{$_.FullName}).tolower()
 foreach ($Profile in $ProfileListRegistry) {
     if (($Profile | Get-ItemProperty).Psobject.Properties | Where-Object { $_.Name -eq 'ProfileImagePath' -and $_.Value -notlike 'C:\WINDOWS*'} | Select-Object Value) {
         $ProfileImagePaths += ($Profile.GetValue('ProfileImagePath').tolower())
@@ -106,7 +109,8 @@ foreach ($ProfileDirectory in $ProfileDirectories) {
         takeown.exe /R /D Y /F $ProfileDirectory | out-null
         icacls.exe $ProfileDirectory /t /grant *S-1-1-0:F /inheritance:r | out-null
         Get-ChildItem $ProfileDirectory -Recurse| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
-        Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
+        # Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
+        cmd /c rmdir $ProfileDirectory /S /Q
         Write-output ('Status:            Deleted')
     } else {
         Write-output ('Status:            Untouched')
@@ -138,4 +142,6 @@ Write-Output '------------------------------------------------------------------
 
 Write-Output ('')
 Write-Output ('')
-Write-Output '============================================================================================================================================================'
+Write-Output '============================================================================================================================================================' 
+
+
