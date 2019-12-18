@@ -31,7 +31,7 @@ foreach ($Profile in $ProfileListWMI) {
         }
     }
     if (!$ExcludedAccount) {
-        if (($Profile.LastUseTime -ne '') -and ($Profile.LastUseTime -ne $null)) {
+        if (($Profile.LastUseTime -ne '') -and ($Profile.LastUseTime)) {
             Write-Output ('')
             Write-Output ('Profile Directory: ' + $Profile.LocalPath)
             Write-Output ('LastUseTime:       ' + [Management.ManagementDateTimeConverter]::ToDateTime($Profile.LastUseTime))
