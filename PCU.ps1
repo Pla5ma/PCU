@@ -13,7 +13,7 @@ Write-Output '------------------------------------------------------------------
 Write-Output ('')
 Write-Output ('')
 
-$ExcludedPaths=@('C:\users\all users','C:\users\default','C:\users\default user','C:\users\public','C:\users\svc-alti-05','C:\users\svc-alti-03')
+$ExcludedPaths=@('C:\users\all users','C:\users\default','C:\users\default user','C:\users\public')
 $ExcludedAccountsForRetention=@('Administrator')
 $RetentionInDays=-40
 
