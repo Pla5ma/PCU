@@ -19,7 +19,6 @@ $ProfileListWMI = Get-WmiObject Win32_UserProfile | Where-Object { $_.LocalPath 
 $EveryoneSID = New-Object System.Security.Principal.SecurityIdentifier('S-1-1-0')
 $Everyone = ($EveryoneSID.Translate( [System.Security.Principal.NTAccount])).Value
 
-
 Function Delete_Directory($DirectoryName) {
     Get-ChildItem \\?\$DirectoryName -Recurse | Where-Object {$_.PSIsContainer -eq $true} | ForEach-Object {
         $ACL = Get-ACL $_.FullName
