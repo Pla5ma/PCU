@@ -1,26 +1,51 @@
-cls
-
-$Culture = [System.Globalization.CultureInfo]::GetCultureInfo('en-US')
-[System.Threading.Thread]::CurrentThread.CurrentUICulture = $Culture
-[System.Threading.Thread]::CurrentThread.CurrentCulture = $Culture
+Clear-Host
 
 Write-Output ('')
 Write-Output '============================================================================================================================================================'
 Write-Output ('Profile Cleanup Utility')
-Write-Output ('v0.95')
+Write-Output ('v0.99')
 Write-Output ('danhil@microsoft.com')
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
 Write-Output ('')
 Write-Output ('')
 
-$ExcludedPaths=@('C:\users\all users','C:\users\default','C:\users\default user','C:\users\public')
-$ExcludedAccountsForRetention=@('Administrator')
-$RetentionInDays=-40
+$ExcludedPaths                =@('C:\users\all users','C:\users\default','C:\users\default user','C:\users\public')
+$ExcludedAccountsForRetention =@('Administrator','DefaultUser0')
+$RetentionInDays              =-40
 
 $ProfileImagePaths=$ExcludedPaths
 $ProfileListRegistry = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList' -Recurse
 $ProfileListWMI = Get-WmiObject Win32_UserProfile | Where-Object { $_.LocalPath -notlike 'C:\WINDOWS*'}
+$EveryoneSID = New-Object System.Security.Principal.SecurityIdentifier('S-1-1-0')
+$Everyone = ($EveryoneSID.Translate( [System.Security.Principal.NTAccount])).Value
 
+
+Function Delete_Directory($DirectoryName) {
+    Get-ChildItem \\?\$DirectoryName -Recurse | Where-Object {$_.PSIsContainer -eq $true} | ForEach-Object {
+        $ACL = Get-ACL $_.FullName
+        $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','ContainerInherit,Objectinherit','none','Allow')
+        $ACL.AddAccessRule($AccessRule)
+        Set-Acl $_.FullName $ACL
+                    
+    }
+    Get-ChildItem \\?\$DirectoryName | Where-Object {$_.PSIsContainer -eq $true} | ForEach-Object {
+        $ACL = Get-ACL $_.FullName
+        $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','ContainerInherit,Objectinherit','none','Allow')
+        $ACL.AddAccessRule($AccessRule)
+        Set-Acl $_.FullName $ACL
+                    
+    }
+    Get-ChildItem \\?\$DirectoryName -Recurse | Where-Object {$_.PSIsContainer -eq $false} | ForEach-Object {
+        $ACL = Get-ACL $_.FullName
+        $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','none','none','Allow')
+        $ACL.AddAccessRule($AccessRule)
+        Set-Acl $_.FullName $ACL
+        Set-ItemProperty $_.FullName -name IsReadOnly -value $false
+    }
+    Get-ChildItem \\?\$DirectoryName -Recurse | Where-Object {$_.PSIsContainer -eq $False} | ForEach-Object {Remove-Item $_.FullName -Force}
+    Get-ChildItem \\?\$DirectoryName -Recurse | Where-Object {$_.PSIsContainer -eq $True} | ForEach-Object {Remove-Item $_.FullName -Force}
+    Remove-Item \\?\$DirectoryName -Force
+}
 
 Write-Output 'RETENTION POLICY CHECK'
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
@@ -40,11 +65,7 @@ foreach ($Profile in $ProfileListWMI) {
             Write-Output ('LastUseTime:       ' + [Management.ManagementDateTimeConverter]::ToDateTime($Profile.LastUseTime))
             if ([Management.ManagementDateTimeConverter]::ToDateTime($Profile.LastUseTime) -lt (get-date).adddays($RetentionInDays)) {
                 Write-Output ('Valid:             False')
-                takeown.exe /R /D Y /F $Profile.LocalPath | out-null
-                icacls.exe $Profile.LocalPath /t /grant *S-1-1-0:F /inheritance:r | out-null
-                Get-ChildItem $Profile.LocalPath -Recurse| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
-                # Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
-                cmd /c rmdir $ProfileDirectory /S /Q
+                Delete_Directory($ProfileDirectory)
                 Write-output ('Status:            Deleted')
             } else {
                 Write-Output ('Valid:             True')
@@ -59,7 +80,7 @@ Write-Output ('')
 
 Write-Output 'DIRECTORY CLEANUP - MISSING NTUSER.DAT'
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
-$ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | %{$_.FullName}).tolower()
+$ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | ForEach-Object{$_.FullName}).tolower()
 foreach ($ProfileDirectory in $ProfileDirectories) {
     $ExcludedDirectory = $False
     foreach ($ExcludedPath in $ExcludedPaths) {
@@ -72,15 +93,10 @@ foreach ($ProfileDirectory in $ProfileDirectories) {
         Write-Output ('Profile Directory: ' + $ProfileDirectory)
         if (Test-Path ($ProfileDirectory + '\ntuser.dat')) {
             Write-Output ('Valid:             True')
-            Write-output ('Status:            Untouched')
+           Write-output ('Status:            Untouched')
         } else {
             Write-Output ('Valid:             False')
-            Write-Output $ProfileDirectory
-            takeown.exe /R /D Y /F $ProfileDirectory | out-null
-            icacls.exe $ProfileDirectory /t /grant *S-1-1-0:F /inheritance:r | out-null
-            Get-ChildItem $ProfileDirectory -Recurse -force| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
-            # Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
-            cmd /c rmdir $ProfileDirectory /S /Q
+            Delete_Directory($ProfileDirectory)            
             Write-output ('Status:            Deleted')
         }
     }
@@ -91,7 +107,7 @@ Write-Output ('')
 
 Write-Output 'DIRECTORY CLEANUP - MISSING PROFILELIST ENTRY'
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
-$ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | %{$_.FullName}).tolower()
+$ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | ForEach-Object{$_.FullName}).tolower()
 foreach ($Profile in $ProfileListRegistry) {
     if (($Profile | Get-ItemProperty).Psobject.Properties | Where-Object { $_.Name -eq 'ProfileImagePath' -and $_.Value -notlike 'C:\WINDOWS*'} | Select-Object Value) {
         $ProfileImagePaths += ($Profile.GetValue('ProfileImagePath').tolower())
@@ -108,11 +124,7 @@ foreach ($ProfileDirectory in $ProfileDirectories) {
     Write-Output ('Profile Directory: ' + $ProfileDirectory)
     Write-Output ('Valid:             ' + $ValidDirectory)
     if (!$ValidDirectory) {
-        takeown.exe /R /D Y /F $ProfileDirectory | out-null
-        icacls.exe $ProfileDirectory /t /grant *S-1-1-0:F /inheritance:r | out-null
-        Get-ChildItem $ProfileDirectory -Recurse| Where-Object { $_.PSIsContainer -eq $false} | Set-ItemProperty -name IsReadOnly -value $false
-        # Get-ChildItem $ProfileDirectory -Recurse -force | Remove-Item -Force
-        cmd /c rmdir $ProfileDirectory /S /Q
+        Delete_Directory($ProfileDirectory)
         Write-output ('Status:            Deleted')
     } else {
         Write-output ('Status:            Untouched')
@@ -144,6 +156,4 @@ Write-Output '------------------------------------------------------------------
 
 Write-Output ('')
 Write-Output ('')
-Write-Output '============================================================================================================================================================' 
-
-
+Write-Output '============================================================================================================================================================'
