@@ -25,15 +25,13 @@ Function Delete_Directory($DirectoryName) {
         $ACL = Get-ACL $_.FullName
         $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','ContainerInherit,Objectinherit','none','Allow')
         $ACL.AddAccessRule($AccessRule)
-        Set-Acl $_.FullName $ACL
-                    
+        Set-Acl $_.FullName $ACL                  
     }
     Get-ChildItem \\?\$DirectoryName | Where-Object {$_.PSIsContainer -eq $true} | ForEach-Object {
         $ACL = Get-ACL $_.FullName
         $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','ContainerInherit,Objectinherit','none','Allow')
         $ACL.AddAccessRule($AccessRule)
-        Set-Acl $_.FullName $ACL
-                    
+        Set-Acl $_.FullName $ACL                
     }
     Get-ChildItem \\?\$DirectoryName -Recurse | Where-Object {$_.PSIsContainer -eq $false} | ForEach-Object {
         $ACL = Get-ACL $_.FullName
