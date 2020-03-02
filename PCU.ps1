@@ -18,30 +18,27 @@ $ProfileListRegistry = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows NT\Curren
 $ProfileListWMI = Get-WmiObject Win32_UserProfile | Where-Object { $_.LocalPath -notlike 'C:\WINDOWS*'}
 $EveryoneSID = New-Object System.Security.Principal.SecurityIdentifier('S-1-1-0')
 $Everyone = ($EveryoneSID.Translate( [System.Security.Principal.NTAccount])).Value
+$EveryoneIdentity = New-Object System.Security.Principal.NTAccount($Everyone)
 
 Function Delete_Directory($DirectoryName) {
-    Get-ChildItem \\?\$DirectoryName -Recurse | Where-Object {$_.PSIsContainer -eq $true} | ForEach-Object {
-        $ACL = Get-ACL $_.FullName
-        $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','ContainerInherit,Objectinherit','none','Allow')
-        $ACL.AddAccessRule($AccessRule)
-        Set-Acl $_.FullName $ACL                  
+    Get-ChildItem $DirectoryName -Recurse -force | Where-Object {$_.PSIsContainer -eq $true} | ForEach-Object {
+        $ACL = Get-Acl $_.FullName
+        $ACL.SetOwner($EveryoneIdentity)
+        Set-Acl -aclobject $ACL -path $_.FullName
     }
-    Get-ChildItem \\?\$DirectoryName | Where-Object {$_.PSIsContainer -eq $true} | ForEach-Object {
-        $ACL = Get-ACL $_.FullName
-        $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','ContainerInherit,Objectinherit','none','Allow')
-        $ACL.AddAccessRule($AccessRule)
-        Set-Acl $_.FullName $ACL                
+    Get-ChildItem $DirectoryName -force | Where-Object {$_.PSIsContainer -eq $true} | ForEach-Object {
+        $ACL = Get-Acl $_.FullName
+        $ACL.SetOwner($EveryoneIdentity)
+        Set-Acl -aclobject $ACL -path $_.FullName              
     }
-    Get-ChildItem \\?\$DirectoryName -Recurse | Where-Object {$_.PSIsContainer -eq $false} | ForEach-Object {
-        $ACL = Get-ACL $_.FullName
-        $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','none','none','Allow')
-        $ACL.AddAccessRule($AccessRule)
-        Set-Acl $_.FullName $ACL
-        Set-ItemProperty $_.FullName -name IsReadOnly -value $false
+    Get-ChildItem $DirectoryName -Recurse | Where-Object {$_.PSIsContainer -eq $false} | ForEach-Object {
+        $ACL = Get-Acl $_.FullName
+        $ACL.SetOwner($EveryoneIdentity)
+        Set-Acl -aclobject $ACL -path $_.FullName
     }
-    Get-ChildItem \\?\$DirectoryName -Recurse | Where-Object {$_.PSIsContainer -eq $False} | ForEach-Object {Remove-Item $_.FullName -Force}
-    Get-ChildItem \\?\$DirectoryName -Recurse | Where-Object {$_.PSIsContainer -eq $True} | ForEach-Object {Remove-Item $_.FullName -Force}
-    Remove-Item \\?\$DirectoryName -Force
+    Get-ChildItem $DirectoryName -Recurse | Where-Object {$_.PSIsContainer -eq $False} | ForEach-Object {Remove-Item $_.FullName -Force}
+    Get-ChildItem $DirectoryName -Recurse | Where-Object {$_.PSIsContainer -eq $True} | ForEach-Object {Remove-Item $_.FullName -Force}
+    Remove-Item $DirectoryName -Force
 }
 
 Write-Output 'RETENTION POLICY CHECK'
