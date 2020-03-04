@@ -3,7 +3,7 @@ Clear-Host
 Write-Output ('')
 Write-Output '============================================================================================================================================================'
 Write-Output ('Profile Cleanup Utility')
-Write-Output ('v0.99.2')
+Write-Output ('v0.99.3')
 Write-Output ('danhil@microsoft.com')
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
 Write-Output ('')
@@ -12,6 +12,7 @@ Write-Output ('')
 $ExcludedPaths                =@('C:\users\all users','C:\users\default','C:\users\default user','C:\users\public')
 $ExcludedAccountsForRetention =@('Administrator','DefaultUser0')
 $RetentionInDays              =-40
+$DeleteDotDirectories         =1
 
 $ProfileImagePaths=$ExcludedPaths
 $ProfileListRegistry = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList' -Recurse
@@ -19,6 +20,7 @@ $ProfileListWMI = Get-WmiObject Win32_UserProfile | Where-Object { $_.LocalPath 
 $EveryoneSID = New-Object System.Security.Principal.SecurityIdentifier('S-1-1-0')
 $Everyone = ($EveryoneSID.Translate( [System.Security.Principal.NTAccount])).Value
 $EveryoneIdentity = New-Object System.Security.Principal.NTAccount($Everyone)
+$MachineDomain = (Get-WmiObject Win32_ComputerSystem).Domain
 
 Function Delete_Directory($DirectoryName) {
     Get-ChildItem $DirectoryName -Recurse -force | Where-Object {$_.PSIsContainer -eq $true} | ForEach-Object {
@@ -131,6 +133,35 @@ foreach ($ProfileDirectory in $ProfileDirectories) {
 Write-Output ('')
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
 Write-Output ('')
+
+if ($DeleteDotDirectories) {
+    Write-Output 'DIRECTORY CLEANUP - DOT DIRECTORY'
+    Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
+    $ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | ForEach-Object{$_.FullName}).tolower()
+    foreach ($Profile in $ProfileListRegistry) {
+        if (($Profile | Get-ItemProperty).Psobject.Properties | Where-Object { $_.Name -eq 'ProfileImagePath' -and $_.Value -notlike 'C:\WINDOWS*'} | Select-Object Value) {
+            $ProfileImagePaths += ($Profile.GetValue('ProfileImagePath').tolower())
+        }
+    }
+    foreach ($ProfileDirectory in $ProfileDirectories) {
+        Write-Output ('')
+        $ValidDirectory = $true
+        if ($ProfileDirectory -like '*.*') {
+            $ValidDirectory = $false
+        }
+        Write-Output ('Profile Directory: ' + $ProfileDirectory)
+        Write-Output ('Valid:             ' + $ValidDirectory)
+        if (!$ValidDirectory) {
+            Delete_Directory($ProfileDirectory)
+            Write-output ('Status:            Deleted')
+        } else {
+            Write-output ('Status:            Untouched')
+        }
+    }
+    Write-Output ('')
+    Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
+    Write-Output ('')
+}
 
 Write-Output 'REGISTRY CLEANUP - MISSING PROFILE DIRECTORY'
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
