@@ -6,6 +6,7 @@ $ExcludedAccountsForRetention =@('Administrator','DefaultUser0')
 $RetentionInDays              =-40
 $DeleteDotDirectories         =1
 
+Write-StartupInformation
 Write-Output ('')
 Write-Output '============================================================================================================================================================'
 Write-Output ('Profile Cleanup Utility')
@@ -15,11 +16,16 @@ Write-Output '------------------------------------------------------------------
 Write-Output ('')
 Write-Output ('')
 
+Write-LogFile('')
+Write-LogFile('Building profile list Registry')
 $ProfileListRegistry = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList' -Recurse
+Write-LogFile('Building profile list WMI')
 $ProfileListWMI = Get-WmiObject Win32_UserProfile | Where-Object { $_.LocalPath -notlike 'C:\WINDOWS*'}
+Write-LogFile('Getting localized Everyone identity')
 $EveryoneSID = New-Object System.Security.Principal.SecurityIdentifier('S-1-1-0')
 $Everyone = ($EveryoneSID.Translate( [System.Security.Principal.NTAccount])).Value
 $EveryoneIdentity = New-Object System.Security.Principal.NTAccount($Everyone)
+Write-LogFile('Getting machine domain')
 $MachineDomain = (Get-WmiObject Win32_ComputerSystem).Domain
 
 Function Delete_Directory($DirectoryName) {
@@ -53,8 +59,6 @@ Function Write-LogFile($Content) {
 
 Function Write-StartupInformation {
     Write-LogFile('')
-    Write-LogFile('')
-    Write-LogFile('')
     Write-LogFile('Time:                            '+(Get-Date))
     Write-LogFile('Version:                         '+$Version)
     Write-LogFile('Excluded paths:                  '+$ExcludedPaths)
@@ -63,7 +67,6 @@ Function Write-StartupInformation {
     Write-LogFile('Delete . directories:            '+$DeleteDotDirectories)
 }
 
-Write-StartupInformation
 Write-Output 'RETENTION POLICY CHECK'
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
 Write-LogFile ('')
