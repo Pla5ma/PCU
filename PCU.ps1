@@ -6,6 +6,54 @@ $ExcludedAccountsForRetention =@('Administrator','DefaultUser0')
 $RetentionInDays              =-40
 $DeleteDotDirectories         =1
 
+Function Write-LogFile($Content) {
+    $Content | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
+}
+
+Function Write-StartupInformation {
+    Write-LogFile('')
+    Write-LogFile('Time:                            '+(Get-Date))
+    Write-LogFile('Version:                         '+$Version)
+    Write-LogFile('Excluded paths:                  '+$ExcludedPaths)
+    Write-LogFile('Excluded accounts for retention: '+$ExcludedAccountsForRetention)
+    Write-LogFile('Retention in days:               '+$RetentionInDays)
+    Write-LogFile('Delete . directories:            '+$DeleteDotDirectories)
+}
+
+Function Delete_Directory($DirectoryName) {
+    Write-LogFile('*** Directory deletion routine started  ***')
+    Write-LogFile ('Processing directory:           ' + $DirectoryName)
+
+    Get-ChildItem $DirectoryName -Recurse -force | Where-Object {$_.PSIsContainer -eq $true} | ForEach-Object {
+        $ACL = Get-Acl $_.FullName
+        $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','ContainerInherit,Objectinherit','none','Allow')
+        $ACL.AddAccessRule($AccessRule)
+        $ACL.SetOwner($EveryoneIdentity)
+        Write-LogFile ('Setting ACLs for sub directory: '+ $_.FullName)
+        Set-Acl -aclobject $ACL -path $_.FullName 2>&1 | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
+    }
+
+    $ACL = Get-Acl $DirectoryName
+    $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','none','none','Allow')
+    $ACL.AddAccessRule($AccessRule)
+    $ACL.SetOwner($EveryoneIdentity)
+    Write-LogFile ('Setting ACLs for root directory')
+    Set-Acl -aclobject $ACL -path $DirectoryName 2>&1 | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
+
+    Get-ChildItem $DirectoryName -Recurse | Where-Object {$_.PSIsContainer -eq $false} | ForEach-Object {
+        $ACL = Get-Acl $_.FullName
+        $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','none','none','Allow')
+        $ACL.AddAccessRule($AccessRule)
+        $ACL.SetOwner($EveryoneIdentity)
+        Write-LogFile ('Setting ACLs:       '+ $_.FullName)
+        Set-Acl -aclobject $ACL -path $_.FullName 2>&1 | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
+    }
+
+    Write-LogFile ('Deleting directory')
+    cmd /c "rd /q /s $DirectoryName" 2>&1 | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
+    Write-LogFile('*** Directory deletion routine finished ***')
+}
+
 Write-StartupInformation
 Write-Output ('')
 Write-Output '============================================================================================================================================================'
@@ -28,50 +76,13 @@ $EveryoneIdentity = New-Object System.Security.Principal.NTAccount($Everyone)
 Write-LogFile('Getting machine domain')
 $MachineDomain = (Get-WmiObject Win32_ComputerSystem).Domain
 
-Function Delete_Directory($DirectoryName) {
-    Get-ChildItem $DirectoryName -Recurse -force | Where-Object {$_.PSIsContainer -eq $true} | ForEach-Object {
-        $ACL = Get-Acl $_.FullName
-        $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','ContainerInherit,Objectinherit','none','Allow')
-        $ACL.AddAccessRule($AccessRule)
-        $ACL.SetOwner($EveryoneIdentity)
-        Set-Acl -aclobject $ACL -path $_.FullName
-    }
-    Get-ChildItem $DirectoryName -force | Where-Object {$_.PSIsContainer -eq $true} | ForEach-Object {
-        $ACL = Get-Acl $_.FullName
-        $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','ContainerInherit,Objectinherit','none','Allow')
-        $ACL.AddAccessRule($AccessRule)
-        $ACL.SetOwner($EveryoneIdentity)
-        Set-Acl -aclobject $ACL -path $_.FullName              
-    }
-    Get-ChildItem $DirectoryName -Recurse | Where-Object {$_.PSIsContainer -eq $false} | ForEach-Object {
-        $ACL = Get-Acl $_.FullName
-        $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','none','none','Allow')
-        $ACL.AddAccessRule($AccessRule)
-        $ACL.SetOwner($EveryoneIdentity)
-        Set-Acl -aclobject $ACL -path $_.FullName
-    }
-    cmd /c "rd /q /s $DirectoryName"
-}
-
-Function Write-LogFile($Content) {
-    $Content | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
-}
-
-Function Write-StartupInformation {
-    Write-LogFile('')
-    Write-LogFile('Time:                            '+(Get-Date))
-    Write-LogFile('Version:                         '+$Version)
-    Write-LogFile('Excluded paths:                  '+$ExcludedPaths)
-    Write-LogFile('Excluded accounts for retention: '+$ExcludedAccountsForRetention)
-    Write-LogFile('Retention in days:               '+$RetentionInDays)
-    Write-LogFile('Delete . directories:            '+$DeleteDotDirectories)
-}
-
 Write-Output 'RETENTION POLICY CHECK'
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
 Write-LogFile ('')
+Write-LogFile ('')
 Write-LogFile ('RETENTION POLICY CHECK')
 foreach ($Profile in $ProfileListWMI) {
+    Write-LogFile ('')
     Write-LogFile('ACCOUNT:     '+(Split-Path $Profile.LocalPath -Leaf))
     $ExcludedAccount = $False
     foreach ($Account in $ExcludedAccountsForRetention) {
@@ -108,9 +119,11 @@ Write-Output ('')
 Write-Output 'DIRECTORY CLEANUP - MISSING NTUSER.DAT'
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
 Write-LogFile ('')
+Write-LogFile ('')
 Write-LogFile ('DIRECTORY CLEANUP - MISSING NTUSER.DAT')
 $ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | ForEach-Object{$_.FullName}).tolower()
 foreach ($ProfileDirectory in $ProfileDirectories) {
+    Write-LogFile ('')
     Write-LogFile('DIRECTORY: '+$ProfileDirectory)
     $ExcludedDirectory = $False
     foreach ($ExcludedPath in $ExcludedPaths) {
@@ -141,6 +154,7 @@ Write-Output ('')
 Write-Output 'DIRECTORY CLEANUP - MISSING PROFILELIST ENTRY'
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
 Write-LogFile ('')
+Write-LogFile ('')
 Write-LogFile ('DIRECTORY CLEANUP - MISSING PROFILELIST ENTRY')
 $ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | ForEach-Object{$_.FullName}).tolower()
 $ProfileImagePaths=$ExcludedPaths
@@ -150,6 +164,7 @@ foreach ($Profile in $ProfileListRegistry) {
     }
 }
 foreach ($ProfileDirectory in $ProfileDirectories) {
+    Write-LogFile ('')
     Write-LogFile('DIRECTORY: '+$ProfileDirectory)
     Write-Output ('Profile Directory: ' + $ProfileDirectory)
     Write-Output ('')
@@ -176,6 +191,7 @@ if ($DeleteDotDirectories) {
     Write-Output 'DIRECTORY CLEANUP - DOT DIRECTORY'
     Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
     Write-LogFile ('')
+    Write-LogFile ('')
     Write-LogFile ('DIRECTORY CLEANUP - DOT DIRECTORY')
     $ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | ForEach-Object{$_.FullName}).tolower()
     $ProfileImagePaths=$ExcludedPaths
@@ -185,6 +201,7 @@ if ($DeleteDotDirectories) {
         }
     }
     foreach ($ProfileDirectory in $ProfileDirectories) {
+        Write-LogFile ('')
         Write-LogFile('DIRECTORY: '+$ProfileDirectory)
         Write-Output ('Profile Directory: ' + $ProfileDirectory)
         Write-Output ('')
@@ -209,10 +226,12 @@ if ($DeleteDotDirectories) {
 Write-Output 'REGISTRY CLEANUP - MISSING PROFILE DIRECTORY'
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
 Write-LogFile ('')
+Write-LogFile ('')
 Write-LogFile ('REGISTRY CLEANUP - MISSING PROFILE DIRECTORY')
 foreach ($Profile in $ProfileListRegistry) {
     if (($Profile | Get-ItemProperty).Psobject.Properties | Where-Object { $_.Name -eq 'ProfileImagePath' -and $_.Value -notlike 'C:\WINDOWS*'} | Select-Object Value) {
         Write-Output ('')
+        Write-LogFile ('')
         Write-LogFile('PROFILELIST KEY:   ' + $Profile.Name)
         Write-Output ('ProfileList Key:   ' + $Profile.Name)
         Write-LogFile('Profile Directory: ' + $Profile.GetValue('ProfileImagePath'))
@@ -224,7 +243,7 @@ foreach ($Profile in $ProfileListRegistry) {
         } else {
             Write-LogFile('Valid:             False')
             Write-Output ('Valid:             False')
-            Remove-Item -Recurse -Force $Profile.PSPath
+            Remove-Item -Recurse -Force $Profile.PSPath 2>&1 | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
             Write-output ('Status:            Deleted')
         }
     }
