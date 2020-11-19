@@ -1,10 +1,11 @@
 Clear-Host
 
-$Version                      ='v0.99.4'
+$Version                      ='v0.99.5'
 $ExcludedPaths                =@('C:\users\all users','C:\users\default','C:\users\default user','C:\users\public')
 $ExcludedAccountsForRetention =@('Administrator','DefaultUser0')
 $RetentionInDays              =-40
 $DeleteDotDirectories         =1
+$LocalizedEventlogString      ='Account Name' #'Kontoname'
 
 Function Write-LogFile($Content) {
     $Content | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
@@ -75,6 +76,8 @@ $Everyone = ($EveryoneSID.Translate( [System.Security.Principal.NTAccount])).Val
 $EveryoneIdentity = New-Object System.Security.Principal.NTAccount($Everyone)
 Write-LogFile('Getting machine domain')
 $MachineDomain = (Get-WmiObject Win32_ComputerSystem).Domain
+Write-LogFile('Getting logon events')
+$LogonEvents = Get-EventLog -LogName Security -InstanceId 4624
 
 Write-Output 'RETENTION POLICY CHECK'
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
@@ -83,8 +86,9 @@ Write-LogFile ('')
 Write-LogFile ('RETENTION POLICY CHECK')
 foreach ($Profile in $ProfileListWMI) {
     Write-LogFile ('')
-    Write-LogFile('ACCOUNT:     '+(Split-Path $Profile.LocalPath -Leaf))
-    $ExcludedAccount = $False
+    Write-Output ('')
+    Write-LogFile('PROFILE:     '+$Profile.LocalPath)
+    Write-Output ('PROFILE:           '+$Profile.LocalPath)
     foreach ($Account in $ExcludedAccountsForRetention) {
         if ($Profile.LocalPath) {
             if ($Profile.LocalPath.tolower() -like '*'+$Account.tolower()+'*') {
@@ -94,21 +98,51 @@ foreach ($Profile in $ProfileListWMI) {
     }
     Write-LogFile ('Excluded:    '+$ExcludedAccount)
     if (!$ExcludedAccount) {
-        if (($Profile.LastUseTime -ne '') -and ($Profile.LastUseTime)) {
-            Write-Output ('')
-            Write-Output ('Profile Directory: ' + $Profile.LocalPath)
-            Write-LogFile ('LastUseTime: ' + [Management.ManagementDateTimeConverter]::ToDateTime($Profile.LastUseTime))
-            Write-Output ('LastUseTime:       ' + [Management.ManagementDateTimeConverter]::ToDateTime($Profile.LastUseTime))
-            if ([Management.ManagementDateTimeConverter]::ToDateTime($Profile.LastUseTime) -lt (get-date).adddays($RetentionInDays)) {
-                Write-LogFile ('Valid:       False')
-                Write-Output ('Valid:             False')
-                Delete_Directory($ProfileDirectory)
-                Write-output ('Status:            Deleted')
-            } else {
-                Write-LogFile ('Valid:       True')
-                Write-Output ('Valid:             True')
-                Write-output ('Status:            Untouched')
+
+        $PathUser = (Split-Path $Profile.LocalPath -Leaf)
+        if ($PathUser.Contains('.')) {
+            $PathUser = $PathUser.Substring(0, $PathUser.LastIndexOf('.'))
+        }
+
+        $LastLogon = $null
+        foreach ($Event in $LogonEvents) {
+            $LogonAccount = (($Event.Message | Select-String ('.*' + $LocalizedEventlogString + ':.*') -AllMatches).Matches)[1].Value.ToString()
+            $LogonAccount = $LogonAccount -replace ($LocalizedEventlogString + ':'), ''
+            $LogonAccount = $LogonAccount -replace [char]9, ''
+            $LogonAccount = $LogonAccount -replace ' ', ''
+            $LogonAccount = $LogonAccount.Substring(0, $LogonAccount.Length - 1)
+            if ($LogonAccount.Contains('@')) {
+                $LogonAccount = $LogonAccount.Substring(0, $LogonAccount.LastIndexOf('@'))
             }
+            if ($LogonAccount -ieq $PathUser) {
+                $LastLogon = $Event.TimeGenerated
+                break
+            }
+        }
+        if (!$LastLogon) {
+            Write-LogFile ('Logon:       No logon events found')
+            Write-Output ('Logon:             No logon events found')
+            Write-LogFile ('Valid:       False')
+            Write-Output ('Valid:             False')
+            Delete_Directory($Profile.LocalPath)
+            Write-output ('Status:            Deleted')
+        } elseif ($LastLogon -lt (get-date).adddays($RetentionInDays)) {
+            Write-LogFile ('Logon:       '+$LastLogon)
+            Write-Output ('Logon:             '+$LastLogon)
+            Write-LogFile ('Age:         '+((get-date).Subtract($LastLogon).Days))
+            Write-Output ('Age:               '+((get-date).Subtract($LastLogon).Days))
+            Write-LogFile ('Valid:       False')
+            Write-Output ('Valid:             False')
+            Delete_Directory($Profile.LocalPath)
+            Write-output ('Status:            Deleted')
+        } else {
+            Write-LogFile ('Logon:       '+$LastLogon)
+            Write-Output ('Logon:             '+$LastLogon)
+            Write-LogFile ('Age:         '+((get-date).Subtract($LastLogon).Days))
+            Write-Output ('Age:               '+((get-date).Subtract($LastLogon).Days))
+            Write-LogFile ('Valid:       True')
+            Write-Output ('Valid:             True')
+            Write-output ('Status:            Untouched')
         }
     }
 }
