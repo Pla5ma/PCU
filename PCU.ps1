@@ -5,7 +5,7 @@ $ExcludedPaths                =@('C:\users\all users','C:\users\default','C:\use
 $ExcludedAccountsForRetention =@('Administrator','DefaultUser0')
 $RetentionInDays              =-40
 $DeleteDotDirectories         =1
-$LocalizedEventlogString      ='Account Name' #'Kontoname'
+$LocalizedEventlogString      ='Kontoname'
 
 Function Write-LogFile($Content) {
     $Content | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
@@ -89,15 +89,21 @@ foreach ($Profile in $ProfileListWMI) {
     Write-Output ('')
     Write-LogFile('PROFILE:     '+$Profile.LocalPath)
     Write-Output ('PROFILE:           '+$Profile.LocalPath)
+    $ExcludedDirectory = $False
     foreach ($Account in $ExcludedAccountsForRetention) {
         if ($Profile.LocalPath) {
             if ($Profile.LocalPath.tolower() -like '*'+$Account.tolower()+'*') {
-                $ExcludedAccount = $True                
+                $ExcludedDirectory = $True                
             }
         }
     }
-    Write-LogFile ('Excluded:    '+$ExcludedAccount)
-    if (!$ExcludedAccount) {
+    foreach ($ExcludedPath in $ExcludedPaths) {
+        if ($Profile.LocalPath.tolower() -eq $ExcludedPath.tolower()) {
+            $ExcludedDirectory = $True
+        }
+    }
+    Write-LogFile ('Excluded:    '+$ExcludedDirectory)
+    if (!$ExcludedDirectory) {
 
         $PathUser = (Split-Path $Profile.LocalPath -Leaf)
         if ($PathUser.Contains('.')) {
@@ -287,4 +293,4 @@ Write-Output '------------------------------------------------------------------
 
 Write-Output ('')
 Write-Output ('')
-Write-Output '============================================================================================================================================================'
+Write-Output '============================================================================================================================================================' 
