@@ -1,14 +1,23 @@
 Clear-Host
 
-$Version                      ='v0.99.5'
+$Version                      ='v1.0.060121 RC1'
 $ExcludedPaths                =@('C:\users\all users','C:\users\default','C:\users\default user','C:\users\public')
 $ExcludedAccountsForRetention =@('Administrator','DefaultUser0')
 $RetentionInDays              =-40
 $DeleteDotDirectories         =1
 $LocalizedEventlogString      ='Kontoname'
+$DeleteLogFile                =1
 
 Function Write-LogFile($Content) {
     $Content | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
+}
+
+Function Delete-LogFile() {
+    if ($DeleteLogFile) {
+        if (Test-Path $Env:SystemRoot\Temp\PCU.log) {
+            Remove-Item -Force $Env:SystemRoot\Temp\PCU.log
+        }
+    }
 }
 
 Function Write-StartupInformation {
@@ -24,6 +33,10 @@ Function Write-StartupInformation {
 Function Delete_Directory($DirectoryName) {
     Write-LogFile('*** Directory deletion routine started  ***')
     Write-LogFile ('Processing directory:           ' + $DirectoryName)
+
+    Write-LogFile ('Deleting directory - Fast')
+    cmd /c "rd /q /s $DirectoryName" 2>&1 | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
+    Write-LogFile('*** Fast directory deletion routine finished ***')
 
     Get-ChildItem $DirectoryName -Recurse -force | Where-Object {$_.PSIsContainer -eq $true} | ForEach-Object {
         $ACL = Get-Acl $_.FullName
@@ -50,12 +63,15 @@ Function Delete_Directory($DirectoryName) {
         Set-Acl -aclobject $ACL -path $_.FullName 2>&1 | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
     }
 
-    Write-LogFile ('Deleting directory')
+    Write-LogFile ('Deleting directory - Slow')
     cmd /c "rd /q /s $DirectoryName" 2>&1 | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
-    Write-LogFile('*** Directory deletion routine finished ***')
+    Write-LogFile('*** Slow directory deletion routine finished ***')
 }
 
+Delete-LogFile
+pause
 Write-StartupInformation
+pause
 Write-Output ('')
 Write-Output '============================================================================================================================================================'
 Write-Output ('Profile Cleanup Utility')
@@ -293,4 +309,4 @@ Write-Output '------------------------------------------------------------------
 
 Write-Output ('')
 Write-Output ('')
-Write-Output '============================================================================================================================================================' 
+Write-Output '============================================================================================================================================================'  
