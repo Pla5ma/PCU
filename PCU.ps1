@@ -5,7 +5,7 @@ $ExcludedPaths                =@('C:\users\all users','C:\users\default','C:\use
 $ExcludedAccountsForRetention =@('Administrator','DefaultUser0')
 $RetentionInDays              =-40
 $DeleteDotDirectories         =1
-$LocalizedEventlogString      ='Kontoname'
+$LocalizedEventlogString      ='Account Name'
 $DeleteLogFile                =1
 
 Function Write-LogFile($Content) {
