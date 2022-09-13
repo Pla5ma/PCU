@@ -4,7 +4,7 @@ $Version                      ='v1.1.120922'
 $ExcludedPaths                =@('C:\users\all users','C:\users\default','C:\users\default user','C:\users\public')
 $ExcludedAccountsForRetention =@('Administrator','DefaultUser0')
 $RetentionInDays              =-365
-$MaximumSizeinMB              =1048576
+$MaximumSizeInMB              =1048576
 $DeleteDotDirectories         =0
 $LocalizedEventlogString      ='Account Name'
 $DeleteLogFile                =1
@@ -28,7 +28,7 @@ Function Write-StartupInformation {
     Write-LogFile('Excluded paths:                  '+$ExcludedPaths)
     Write-LogFile('Excluded accounts for retention: '+$ExcludedAccountsForRetention)
     Write-LogFile('Retention in days:               '+$RetentionInDays)
-    Write-LogFile('Maximum size in MB:              '+$MaximumSizeinMB)
+    Write-LogFile('Maximum size in MB:              '+$MaximumSizeInMB)
     Write-LogFile('Delete . directories:            '+$DeleteDotDirectories)
 }
 
@@ -196,7 +196,7 @@ foreach ($ProfileDirectory in $ProfileDirectories) {
 
         Write-LogFile('Size:                    '+($ProfileSize/1048576)+'MB')
         Write-Output ('Size:                    '+($ProfileSize/1048576)+'MB')
-        if (($ProfileSize/1048576) -le $MaximumSizeinMB) {
+        if (($ProfileSize/1048576) -le $MaximumSizeInMB) {
 
            Write-LogFile('Valid:                   True')
            Write-Output ('Valid:                   True')
