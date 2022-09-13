@@ -1,10 +1,11 @@
 Clear-Host
 
-$Version                      ='v1.0.060121 RC1'
+$Version                      ='v1.1.120922'
 $ExcludedPaths                =@('C:\users\all users','C:\users\default','C:\users\default user','C:\users\public')
 $ExcludedAccountsForRetention =@('Administrator','DefaultUser0')
-$RetentionInDays              =-40
-$DeleteDotDirectories         =1
+$RetentionInDays              =-365
+$MaximumSizeinMB              =1048576
+$DeleteDotDirectories         =0
 $LocalizedEventlogString      ='Account Name'
 $DeleteLogFile                =1
 
@@ -27,6 +28,7 @@ Function Write-StartupInformation {
     Write-LogFile('Excluded paths:                  '+$ExcludedPaths)
     Write-LogFile('Excluded accounts for retention: '+$ExcludedAccountsForRetention)
     Write-LogFile('Retention in days:               '+$RetentionInDays)
+    Write-LogFile('Maximum size in MB:              '+$MaximumSizeinMB)
     Write-LogFile('Delete . directories:            '+$DeleteDotDirectories)
 }
 
@@ -69,9 +71,7 @@ Function Delete_Directory($DirectoryName) {
 }
 
 Delete-LogFile
-pause
 Write-StartupInformation
-pause
 Write-Output ('')
 Write-Output '============================================================================================================================================================'
 Write-Output ('Profile Cleanup Utility')
@@ -90,8 +90,6 @@ Write-LogFile('Getting localized Everyone identity')
 $EveryoneSID = New-Object System.Security.Principal.SecurityIdentifier('S-1-1-0')
 $Everyone = ($EveryoneSID.Translate( [System.Security.Principal.NTAccount])).Value
 $EveryoneIdentity = New-Object System.Security.Principal.NTAccount($Everyone)
-Write-LogFile('Getting machine domain')
-$MachineDomain = (Get-WmiObject Win32_ComputerSystem).Domain
 Write-LogFile('Getting logon events')
 $LogonEvents = Get-EventLog -LogName Security -InstanceId 4624
 
@@ -101,10 +99,10 @@ Write-LogFile ('')
 Write-LogFile ('')
 Write-LogFile ('RETENTION POLICY CHECK')
 foreach ($Profile in $ProfileListWMI) {
-    Write-LogFile ('')
+    Write-LogFile('')
     Write-Output ('')
-    Write-LogFile('PROFILE:     '+$Profile.LocalPath)
-    Write-Output ('PROFILE:           '+$Profile.LocalPath)
+    Write-LogFile('Directory:               '+$Profile.LocalPath)
+    Write-Output ('Directory:               '+$Profile.LocalPath)
     $ExcludedDirectory = $False
     foreach ($Account in $ExcludedAccountsForRetention) {
         if ($Profile.LocalPath) {
@@ -118,7 +116,8 @@ foreach ($Profile in $ProfileListWMI) {
             $ExcludedDirectory = $True
         }
     }
-    Write-LogFile ('Excluded:    '+$ExcludedDirectory)
+    Write-LogFile('Excluded:                '+$ExcludedDirectory)
+    Write-Output ('Excluded:                '+$ExcludedDirectory)
     if (!$ExcludedDirectory) {
 
         $PathUser = (Split-Path $Profile.LocalPath -Leaf)
@@ -142,29 +141,71 @@ foreach ($Profile in $ProfileListWMI) {
             }
         }
         if (!$LastLogon) {
-            Write-LogFile ('Logon:       No logon events found')
-            Write-Output ('Logon:             No logon events found')
-            Write-LogFile ('Valid:       False')
-            Write-Output ('Valid:             False')
+            Write-LogFile('Logon:                   No logon events found')
+            Write-Output ('Logon:                   No logon events found')
+            Write-LogFile('Valid:                   False')
+            Write-Output ('Valid:                   False')
             Delete_Directory($Profile.LocalPath)
-            Write-output ('Status:            Deleted')
+            Write-output ('Status:                  Deleted')
         } elseif ($LastLogon -lt (get-date).adddays($RetentionInDays)) {
-            Write-LogFile ('Logon:       '+$LastLogon)
-            Write-Output ('Logon:             '+$LastLogon)
-            Write-LogFile ('Age:         '+((get-date).Subtract($LastLogon).Days))
-            Write-Output ('Age:               '+((get-date).Subtract($LastLogon).Days))
-            Write-LogFile ('Valid:       False')
-            Write-Output ('Valid:             False')
+            Write-LogFile('Logon:                   '+$LastLogon)
+            Write-Output ('Logon:                   '+$LastLogon)
+            Write-LogFile('Age:                     '+((get-date).Subtract($LastLogon).Days))
+            Write-Output ('Age:                     '+((get-date).Subtract($LastLogon).Days))
+            Write-LogFile('Valid:                   False')
+            Write-Output ('Valid:                   False')
             Delete_Directory($Profile.LocalPath)
-            Write-output ('Status:            Deleted')
+            Write-output ('Status:                  Deleted')
         } else {
-            Write-LogFile ('Logon:       '+$LastLogon)
-            Write-Output ('Logon:             '+$LastLogon)
-            Write-LogFile ('Age:         '+((get-date).Subtract($LastLogon).Days))
-            Write-Output ('Age:               '+((get-date).Subtract($LastLogon).Days))
-            Write-LogFile ('Valid:       True')
-            Write-Output ('Valid:             True')
-            Write-output ('Status:            Untouched')
+            Write-LogFile('Logon:                   '+$LastLogon)
+            Write-Output ('Logon:                   '+$LastLogon)
+            Write-LogFile('Age:                     '+((get-date).Subtract($LastLogon).Days))
+            Write-Output ('Age:                     '+((get-date).Subtract($LastLogon).Days))
+            Write-LogFile('Valid:                   True')
+            Write-Output ('Valid:                   True')
+            Write-output ('Status:                  Untouched')
+        }
+    }
+}
+Write-Output ('')
+Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
+Write-Output ('')
+
+Write-Output 'MAXIMUM SIZE CHECK'
+Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
+Write-LogFile ('')
+Write-LogFile ('')
+Write-LogFile ('MAXIMUM SIZE CHECK')
+$ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | ForEach-Object{$_.FullName}).tolower()
+foreach ($ProfileDirectory in $ProfileDirectories) {
+    Write-LogFile('')
+    Write-Output ('')
+    Write-LogFile('Directory:               '+$ProfileDirectory)
+    Write-Output ('Directory:               '+$ProfileDirectory)
+    $ExcludedDirectory = $False
+    foreach ($ExcludedPath in $ExcludedPaths) {
+        if ($ProfileDirectory -eq $ExcludedPath.tolower()) {
+            $ExcludedDirectory = $True
+        }
+    }
+    Write-LogFile('Excluded:                '+$ExcludedDirectory)
+    Write-Output ('Excluded:                '+$ExcludedDirectory)
+    if (!$ExcludedDirectory) {
+        $ProfileSize = ''
+        $ProfileSize = Get-ChildItem $DirectoryName -Recurse -force 2> $null | Measure-Object -Sum Length | Select-Object -ExpandProperty Sum
+
+        Write-LogFile('Size:                    '+($ProfileSize/1048576)+'MB')
+        Write-Output ('Size:                    '+($ProfileSize/1048576)+'MB')
+        if (($ProfileSize/1048576) -le $MaximumSizeinMB) {
+
+           Write-LogFile('Valid:                   True')
+           Write-Output ('Valid:                   True')
+           Write-output ('Status:                  Untouched')
+        } else {
+           Write-LogFile('Valid:                   False')
+           Write-Output ('Valid:                   False')
+           Delete_Directory($ProfileDirectory)            
+           Write-output ('Status:                  Deleted')
         }
     }
 }
@@ -179,27 +220,28 @@ Write-LogFile ('')
 Write-LogFile ('DIRECTORY CLEANUP - MISSING NTUSER.DAT')
 $ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | ForEach-Object{$_.FullName}).tolower()
 foreach ($ProfileDirectory in $ProfileDirectories) {
-    Write-LogFile ('')
-    Write-LogFile('DIRECTORY: '+$ProfileDirectory)
+    Write-LogFile('')
+    Write-Output ('')
+    Write-LogFile('Directory:               '+$ProfileDirectory)
+    Write-Output ('Directory:               '+$ProfileDirectory)
     $ExcludedDirectory = $False
     foreach ($ExcludedPath in $ExcludedPaths) {
         if ($ProfileDirectory -eq $ExcludedPath.tolower()) {
             $ExcludedDirectory = $True
         }
     }
-    Write-LogFile ('Excluded:  '+$ExcludedDirectory)
+    Write-LogFile('Excluded:                '+$ExcludedDirectory)
+    Write-Output ('Excluded:                '+$ExcludedDirectory)
     if (!$ExcludedDirectory) {
-        Write-Output ('')
-        Write-Output ('Profile Directory: ' + $ProfileDirectory)
         if (Test-Path ($ProfileDirectory + '\ntuser.dat')) {
-           Write-LogFile ('Valid:     True')
-           Write-Output ('Valid:             True')
-           Write-output ('Status:            Untouched')
+           Write-LogFile('Valid:                   True')
+           Write-Output ('Valid:                   True')
+           Write-output ('Status:                  Untouched')
         } else {
-            Write-LogFile ('Valid:     False')
-            Write-Output ('Valid:             False')
-            Delete_Directory($ProfileDirectory)            
-            Write-output ('Status:            Deleted')
+           Write-LogFile('Valid:                   False')
+           Write-Output ('Valid:                   False')
+           Delete_Directory($ProfileDirectory)            
+           Write-Output ('Status:                  Deleted')
         }
     }
 }
@@ -220,23 +262,25 @@ foreach ($Profile in $ProfileListRegistry) {
     }
 }
 foreach ($ProfileDirectory in $ProfileDirectories) {
-    Write-LogFile ('')
-    Write-LogFile('DIRECTORY: '+$ProfileDirectory)
-    Write-Output ('Profile Directory: ' + $ProfileDirectory)
+    Write-LogFile('')
     Write-Output ('')
+    Write-LogFile('Directory:               '+$ProfileDirectory)
+    Write-Output ('Directory:               '+$ProfileDirectory)
     $ValidDirectory = $false
     foreach ($ProfileImagePath in $ProfileImagePaths) {
         if ($ProfileDirectory -eq $ProfileImagePath) {
             $ValidDirectory = $true
         }        
     }
-    Write-LogFile('Valid:     ' + $ValidDirectory)
-    Write-Output ('Valid:             ' + $ValidDirectory)
+    Write-LogFile('Valid:                   ' + $ValidDirectory)
+    Write-Output ('Valid:                   ' + $ValidDirectory)
     if (!$ValidDirectory) {
         Delete_Directory($ProfileDirectory)
-        Write-output ('Status:            Deleted')
+        Write-LogFile('Status:                  Deleted')
+        Write-Output ('Status:                  Deleted')
     } else {
-        Write-output ('Status:            Untouched')
+        Write-LogFile('Status:                  Untouched')
+        Write-Output ('Status:                  Untouched')
     }
 }
 Write-Output ('')
@@ -257,21 +301,23 @@ if ($DeleteDotDirectories) {
         }
     }
     foreach ($ProfileDirectory in $ProfileDirectories) {
-        Write-LogFile ('')
-        Write-LogFile('DIRECTORY: '+$ProfileDirectory)
-        Write-Output ('Profile Directory: ' + $ProfileDirectory)
+        Write-LogFile('')
         Write-Output ('')
+        Write-LogFile('Directory:               '+$ProfileDirectory)
+        Write-Output ('Directory:               '+$ProfileDirectory)
         $ValidDirectory = $true
         if ($ProfileDirectory -like '*.*') {
             $ValidDirectory = $false
         }
-        Write-LogFile('Valid:     ' + $ValidDirectory)        
-        Write-Output ('Valid:             ' + $ValidDirectory)
+        Write-LogFile('Valid:                   '+$ValidDirectory)        
+        Write-Output ('Valid:                   '+$ValidDirectory)
         if (!$ValidDirectory) {
             Delete_Directory($ProfileDirectory)
-            Write-output ('Status:            Deleted')
+            Write-LogFile('Status:                  Deleted')
+            Write-Output ('Status:                  Deleted')
         } else {
-            Write-output ('Status:            Untouched')
+            Write-LogFile('Status:                  Untouched')
+            Write-Output ('Status:                  Untouched')
         }
     }
     Write-Output ('')
@@ -287,20 +333,22 @@ Write-LogFile ('REGISTRY CLEANUP - MISSING PROFILE DIRECTORY')
 foreach ($Profile in $ProfileListRegistry) {
     if (($Profile | Get-ItemProperty).Psobject.Properties | Where-Object { $_.Name -eq 'ProfileImagePath' -and $_.Value -notlike 'C:\WINDOWS*'} | Select-Object Value) {
         Write-Output ('')
-        Write-LogFile ('')
-        Write-LogFile('PROFILELIST KEY:   ' + $Profile.Name)
-        Write-Output ('ProfileList Key:   ' + $Profile.Name)
-        Write-LogFile('Profile Directory: ' + $Profile.GetValue('ProfileImagePath'))
-        Write-Output ('Profile Directory: ' + $Profile.GetValue('ProfileImagePath'))
+        Write-LogFile('')
+        Write-LogFile('ProfileList Key:         '+$Profile.Name)
+        Write-Output ('ProfileList Key:         '+$Profile.Name)
+        Write-LogFile('Directory:               '+$Profile.GetValue('ProfileImagePath'))
+        Write-Output ('Directory:               '+$Profile.GetValue('ProfileImagePath'))
         if (Test-Path $Profile.GetValue('ProfileImagePath') -PathType Container) {
-            Write-LogFile('Valid:             True')
-            Write-Output ('Valid:             True')
-            Write-output ('Status:            Untouched')
+            Write-LogFile('Valid:                   True')
+            Write-Output ('Valid:                   True')
+            Write-LogFile('Status:                  Untouched')
+            Write-Output ('Status:                  Untouched')
         } else {
-            Write-LogFile('Valid:             False')
-            Write-Output ('Valid:             False')
+            Write-LogFile('Valid:                   False')
+            Write-Output ('Valid:                   False')
             Remove-Item -Recurse -Force $Profile.PSPath 2>&1 | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
-            Write-output ('Status:            Deleted')
+            Write-LogFile('Status:                  Deleted')
+            Write-Output ('Status:                  Deleted')
         }
     }
 }
