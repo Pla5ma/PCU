@@ -34,12 +34,18 @@ Function Write-StartupInformation {
 
 Function Delete_Directory($DirectoryName) {
     Write-LogFile('*** Directory deletion routine started  ***')
-    Write-LogFile ('Processing directory:           ' + $DirectoryName)
+    Write-Output ('*** Directory deletion routine started  ***')
+    Write-LogFile('Processing directory:           ' + $DirectoryName)
+    Write-Output ('Processing directory:           ' + $DirectoryName)
 
-    Write-LogFile ('Deleting directory - Fast')
+    Write-LogFile('Deleting directory - Fast')
+    Write-Output ('Deleting directory - Fast')
     cmd /c "rd /q /s $DirectoryName" 2>&1 | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
     Write-LogFile('*** Fast directory deletion routine finished ***')
-
+    Write-Output ('*** Fast directory deletion routine finished ***')
+    Write-LogFile('Deleting directory - Slow')
+    Write-Output ('Deleting directory - Slow')
+    
     Get-ChildItem $DirectoryName -Recurse -force | Where-Object {$_.PSIsContainer -eq $true} | ForEach-Object {
         $ACL = Get-Acl $_.FullName
         $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','ContainerInherit,Objectinherit','none','Allow')
@@ -53,7 +59,8 @@ Function Delete_Directory($DirectoryName) {
     $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','none','none','Allow')
     $ACL.AddAccessRule($AccessRule)
     $ACL.SetOwner($EveryoneIdentity)
-    Write-LogFile ('Setting ACLs for root directory')
+    Write-LogFile('Setting ACLs for root directory')
+    Write-Output ('Setting ACLs for root directory')
     Set-Acl -aclobject $ACL -path $DirectoryName 2>&1 | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
 
     Get-ChildItem $DirectoryName -Recurse | Where-Object {$_.PSIsContainer -eq $false} | ForEach-Object {
@@ -61,13 +68,14 @@ Function Delete_Directory($DirectoryName) {
         $AccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule($Everyone,'FullControl','none','none','Allow')
         $ACL.AddAccessRule($AccessRule)
         $ACL.SetOwner($EveryoneIdentity)
-        Write-LogFile ('Setting ACLs:       '+ $_.FullName)
+        Write-LogFile('Setting ACLs:       '+ $_.FullName)
+        Write-Output ('Setting ACLs:       '+ $_.FullName)
         Set-Acl -aclobject $ACL -path $_.FullName 2>&1 | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
     }
 
-    Write-LogFile ('Deleting directory - Slow')
     cmd /c "rd /q /s $DirectoryName" 2>&1 | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
     Write-LogFile('*** Slow directory deletion routine finished ***')
+    Write-Output ('*** Slow directory deletion routine finished ***')
 }
 
 Delete-LogFile
