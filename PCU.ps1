@@ -1,13 +1,13 @@
 Clear-Host
 
-$Version                      ='v1.1.120922'
-$ExcludedPaths                =@('C:\users\all users','C:\users\default','C:\users\default user','C:\users\public')
-$ExcludedAccountsForRetention =@('Administrator','DefaultUser0')
-$RetentionInDays              =-365
-$MaximumSizeInMB              =1048576
-$DeleteDotDirectories         =0
-$LocalizedEventlogString      ='Account Name'
-$DeleteLogFile                =1
+$Version                             ='v1.12.061022'
+$ExcludedPaths                       =@('C:\users\all users','C:\users\default','C:\users\default user','C:\users\public')
+$ExcludedAccountsForRetentionAndSize =@('Administrator','DefaultUser0')
+$RetentionInDays                     =-365
+$MaximumSizeInMB                     =1048576
+$DeleteDotDirectories                =0
+$LocalizedEventlogString             ='Account Name'
+$DeleteLogFile                       =1
 
 Function Write-LogFile($Content) {
     $Content | Out-File -Append -Force -FilePath $Env:SystemRoot\Temp\PCU.log
@@ -26,7 +26,7 @@ Function Write-StartupInformation {
     Write-LogFile('Time:                            '+(Get-Date))
     Write-LogFile('Version:                         '+$Version)
     Write-LogFile('Excluded paths:                  '+$ExcludedPaths)
-    Write-LogFile('Excluded accounts for retention: '+$ExcludedAccountsForRetention)
+    Write-LogFile('Excluded accounts for retention: '+$ExcludedAccountsForRetentionAndSize)
     Write-LogFile('Retention in days:               '+$RetentionInDays)
     Write-LogFile('Maximum size in MB:              '+$MaximumSizeInMB)
     Write-LogFile('Delete . directories:            '+$DeleteDotDirectories)
@@ -112,7 +112,7 @@ foreach ($Profile in $ProfileListWMI) {
     Write-LogFile('Directory:               '+$Profile.LocalPath)
     Write-Output ('Directory:               '+$Profile.LocalPath)
     $ExcludedDirectory = $False
-    foreach ($Account in $ExcludedAccountsForRetention) {
+    foreach ($Account in $ExcludedAccountsForRetentionAndSize) {
         if ($Profile.LocalPath) {
             if ($Profile.LocalPath.tolower() -like '*'+$Account.tolower()+'*') {
                 $ExcludedDirectory = $True                
@@ -184,15 +184,21 @@ Write-Output '------------------------------------------------------------------
 Write-LogFile ('')
 Write-LogFile ('')
 Write-LogFile ('MAXIMUM SIZE CHECK')
-$ProfileDirectories = (Get-ChildItem 'C:\users' | Where-Object { $_.PSIsContainer -eq $true} | ForEach-Object{$_.FullName}).tolower()
-foreach ($ProfileDirectory in $ProfileDirectories) {
+foreach ($Profile in $ProfileListWMI) {
     Write-LogFile('')
     Write-Output ('')
-    Write-LogFile('Directory:               '+$ProfileDirectory)
-    Write-Output ('Directory:               '+$ProfileDirectory)
+    Write-LogFile('Directory:               '+$Profile.LocalPath)
+    Write-Output ('Directory:               '+$Profile.LocalPath)
     $ExcludedDirectory = $False
+    foreach ($Account in $ExcludedAccountsForRetentionAndSize) {
+        if ($Profile.LocalPath) {
+            if ($Profile.LocalPath.tolower() -like '*'+$Account.tolower()+'*') {
+                $ExcludedDirectory = $True                
+            }
+        }
+    }
     foreach ($ExcludedPath in $ExcludedPaths) {
-        if ($ProfileDirectory -eq $ExcludedPath.tolower()) {
+        if ($Profile.LocalPath.tolower() -eq $ExcludedPath.tolower()) {
             $ExcludedDirectory = $True
         }
     }
@@ -200,11 +206,11 @@ foreach ($ProfileDirectory in $ProfileDirectories) {
     Write-Output ('Excluded:                '+$ExcludedDirectory)
     if (!$ExcludedDirectory) {
         $ProfileSize = ''
-        $ProfileSize = Get-ChildItem $DirectoryName -Recurse -force 2> $null | Measure-Object -Sum Length | Select-Object -ExpandProperty Sum
+        $ProfileSize = [math]::round(((Get-ChildItem $Profile.LocalPath -Recurse -force 2> $null | Measure-Object -Sum Length | Select-Object -ExpandProperty Sum)/1048576),2)
 
-        Write-LogFile('Size:                    '+($ProfileSize/1048576)+'MB')
-        Write-Output ('Size:                    '+($ProfileSize/1048576)+'MB')
-        if (($ProfileSize/1048576) -le $MaximumSizeInMB) {
+        Write-LogFile('Size:                    '+$ProfileSize+'MB')
+        Write-Output ('Size:                    '+$ProfileSize+'MB')
+        if ($ProfileSize -le $MaximumSizeInMB) {
 
            Write-LogFile('Valid:                   True')
            Write-Output ('Valid:                   True')
