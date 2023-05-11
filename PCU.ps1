@@ -1,6 +1,6 @@
 Clear-Host
 
-$Version                             ='v1.12.061022'
+$Version                             ='v1.2.110523'
 $ExcludedPaths                       =@('C:\users\all users','C:\users\default','C:\users\default user','C:\users\public')
 $ExcludedAccountsForRetentionAndSize =@('Administrator','DefaultUser0')
 $RetentionInDays                     =-365
@@ -78,6 +78,23 @@ Function Delete_Directory($DirectoryName) {
     Write-Output ('*** Slow directory deletion routine finished ***')
 }
 
+Function FindAndExclude-InteractiveLoggedOnUsersAndLoadedProfiles() {
+    $ExplorerProcesses = @(Get-WmiObject -Query "Select * FROM Win32_Process WHERE Name='explorer.exe'" -ErrorAction SilentlyContinue)
+    If ($ExplorerProcesses.Count -ne 0) {
+        ForEach ($ExplorerProcess in $ExplorerProcesses)
+        {
+            $global:ExcludedAccountsForRetentionAndSize+=$ExplorerProcess.GetOwner().User
+            Write-LogFile('Excluded user:           '+$ExplorerProcess.GetOwner().User)
+        }
+    }
+    foreach ($Profile in $ProfileListWMI) {
+        if ($Profile.Loaded -eq $true) {
+            $global:ExcludedPaths+=$Profile.LocalPath
+            Write-LogFile('Excluded directories:    '+$Profile.LocalPath)
+        }
+    }
+}
+
 Delete-LogFile
 Write-StartupInformation
 Write-Output ('')
@@ -100,6 +117,11 @@ $Everyone = ($EveryoneSID.Translate( [System.Security.Principal.NTAccount])).Val
 $EveryoneIdentity = New-Object System.Security.Principal.NTAccount($Everyone)
 Write-LogFile('Getting logon events')
 $LogonEvents = Get-EventLog -LogName Security -InstanceId 4624
+Write-LogFile('')
+Write-LogFile('Getting interactive logged on users and loaded profiles')
+FindAndExclude-InteractiveLoggedOnUsersAndLoadedProfiles
+
+
 
 Write-Output 'RETENTION POLICY CHECK'
 Write-Output '------------------------------------------------------------------------------------------------------------------------------------------------------------'
